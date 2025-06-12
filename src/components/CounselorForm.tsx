@@ -7,9 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, User, Check } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import type { Counselor } from '@/pages/Index';
+import type { Counselor, Executive } from '@/pages/Index';
 
 interface CounselorFormProps {
+  executive: Executive;
   onCounselorSaved: (counselor: Counselor) => void;
   onBack: () => void;
 }
@@ -20,6 +21,25 @@ const positions = [
   'Trabajador Social',
   'Coordinador de Bienestar',
   'Psicopedagogo'
+];
+
+const regions = [
+  'Región de Arica y Parinacota',
+  'Región de Tarapacá',
+  'Región de Antofagasta',
+  'Región de Atacama',
+  'Región de Coquimbo',
+  'Región de Valparaíso',
+  'Región Metropolitana',
+  'Región del Libertador General Bernardo O\'Higgins',
+  'Región del Maule',
+  'Región de Ñuble',
+  'Región del Biobío',
+  'Región de La Araucanía',
+  'Región de Los Ríos',
+  'Región de Los Lagos',
+  'Región Aysén del General Carlos Ibáñez del Campo',
+  'Región de Magallanes y de la Antártica Chilena'
 ];
 
 const avatarColors = [
@@ -33,28 +53,28 @@ const avatarColors = [
   'bg-teal-500'
 ];
 
-export const CounselorForm = ({ onCounselorSaved, onBack }: CounselorFormProps) => {
+export const CounselorForm = ({ executive, onCounselorSaved, onBack }: CounselorFormProps) => {
   const [formData, setFormData] = useState({
     fullName: '',
     position: '',
     email: '',
-    phone: ''
+    phone: '',
+    region: '',
+    commune: '',
+    school: ''
   });
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const generateAvatar = (name: string) => {
-    const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    const initials = name || 'OR';
+    const acronym = initials.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
     const colorClass = avatarColors[Math.floor(Math.random() * avatarColors.length)];
-    return `${colorClass}|${initials}`;
+    return `${colorClass}|${acronym}`;
   };
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
-    
-    if (!formData.fullName.trim()) {
-      newErrors.fullName = 'El nombre completo es obligatorio';
-    }
     
     if (!formData.position) {
       newErrors.position = 'Debes seleccionar un cargo';
@@ -63,11 +83,19 @@ export const CounselorForm = ({ onCounselorSaved, onBack }: CounselorFormProps) 
     if (!formData.email.trim()) {
       newErrors.email = 'El correo es obligatorio';
     } else if (!formData.email.includes('@') || !formData.email.includes('.')) {
-      newErrors.email = 'Ingresa un correo válido (@colegio.edu)';
+      newErrors.email = 'Ingresa un correo válido';
     }
-    
-    if (!formData.phone.trim()) {
-      newErrors.phone = 'El teléfono/extensión es obligatorio';
+
+    if (!formData.region) {
+      newErrors.region = 'Debes seleccionar una región';
+    }
+
+    if (!formData.commune.trim()) {
+      newErrors.commune = 'La comuna es obligatoria';
+    }
+
+    if (!formData.school.trim()) {
+      newErrors.school = 'El colegio es obligatorio';
     }
     
     setErrors(newErrors);
@@ -88,18 +116,18 @@ export const CounselorForm = ({ onCounselorSaved, onBack }: CounselorFormProps) 
 
     setIsLoading(true);
     
-    // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     const counselor: Counselor = {
       id: Date.now().toString(),
       ...formData,
-      avatar: generateAvatar(formData.fullName)
+      avatar: generateAvatar(formData.fullName || 'Orientador'),
+      executiveId: executive.id
     };
 
     toast({
       title: "¡Orientador guardado con éxito! 🎉",
-      description: `Bienvenido/a ${formData.fullName}. Ahora vamos con las actividades.`,
+      description: `Datos guardados correctamente. Ahora vamos con las actividades.`,
     });
 
     setIsLoading(false);
@@ -108,7 +136,6 @@ export const CounselorForm = ({ onCounselorSaved, onBack }: CounselorFormProps) 
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
@@ -127,22 +154,29 @@ export const CounselorForm = ({ onCounselorSaved, onBack }: CounselorFormProps) 
         </Button>
         <div>
           <h1 className="text-3xl font-bold">Nuevo orientador</h1>
-          <p className="text-muted-foreground">¡Cuéntanos quién guiará a los estudiantes!</p>
+          <p className="text-muted-foreground">Ejecutiva: <strong>{executive.name}</strong></p>
         </div>
       </div>
 
       {/* Progress indicator */}
       <div className="flex items-center gap-2 mb-8">
         <div className="flex items-center">
+          <div className="w-8 h-8 bg-accent text-accent-foreground rounded-full flex items-center justify-center text-sm">
+            ✓
+          </div>
+          <span className="ml-2 text-sm text-muted-foreground">Ejecutiva</span>
+        </div>
+        <div className="flex-1 h-px bg-border mx-4" />
+        <div className="flex items-center">
           <div className="w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-medium">
-            1
+            2
           </div>
           <span className="ml-2 text-sm font-medium">Datos del orientador</span>
         </div>
         <div className="flex-1 h-px bg-border mx-4" />
         <div className="flex items-center">
           <div className="w-8 h-8 bg-muted text-muted-foreground rounded-full flex items-center justify-center text-sm">
-            2
+            3
           </div>
           <span className="ml-2 text-sm text-muted-foreground">Actividades</span>
         </div>
@@ -152,24 +186,20 @@ export const CounselorForm = ({ onCounselorSaved, onBack }: CounselorFormProps) 
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <User className="h-5 w-5 text-primary" />
-            Información personal
+            Información del orientador
           </CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label htmlFor="fullName">Nombre completo *</Label>
+                <Label htmlFor="fullName">Nombre completo</Label>
                 <Input
                   id="fullName"
                   value={formData.fullName}
                   onChange={(e) => handleInputChange('fullName', e.target.value)}
                   placeholder="Ej: María González López"
-                  className={errors.fullName ? 'border-destructive' : ''}
                 />
-                {errors.fullName && (
-                  <p className="text-sm text-destructive">{errors.fullName}</p>
-                )}
               </div>
 
               <div className="space-y-2">
@@ -192,32 +222,74 @@ export const CounselorForm = ({ onCounselorSaved, onBack }: CounselorFormProps) 
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email">Correo institucional *</Label>
+                <Label htmlFor="email">Correo *</Label>
                 <Input
                   id="email"
                   type="email"
                   value={formData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
-                  placeholder="maria.gonzalez@colegio.edu"
+                  placeholder="correo@ejemplo.com"
                   className={errors.email ? 'border-destructive' : ''}
                 />
                 {errors.email && (
                   <p className="text-sm text-destructive">{errors.email}</p>
                 )}
-                <p className="text-xs text-muted-foreground">Solo correo @colegio.edu</p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="phone">Teléfono / Extensión *</Label>
+                <Label htmlFor="phone">Teléfono</Label>
                 <Input
                   id="phone"
                   value={formData.phone}
                   onChange={(e) => handleInputChange('phone', e.target.value)}
-                  placeholder="Ej: +57 300 123 4567 o Ext. 1234"
-                  className={errors.phone ? 'border-destructive' : ''}
+                  placeholder="Ej: +56 9 1234 5678"
                 />
-                {errors.phone && (
-                  <p className="text-sm text-destructive">{errors.phone}</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="region">Región *</Label>
+                <Select onValueChange={(value) => handleInputChange('region', value)}>
+                  <SelectTrigger className={errors.region ? 'border-destructive' : ''}>
+                    <SelectValue placeholder="Selecciona una región" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {regions.map((region) => (
+                      <SelectItem key={region} value={region}>
+                        {region}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.region && (
+                  <p className="text-sm text-destructive">{errors.region}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="commune">Comuna *</Label>
+                <Input
+                  id="commune"
+                  value={formData.commune}
+                  onChange={(e) => handleInputChange('commune', e.target.value)}
+                  placeholder="Ej: Santiago"
+                  className={errors.commune ? 'border-destructive' : ''}
+                />
+                {errors.commune && (
+                  <p className="text-sm text-destructive">{errors.commune}</p>
+                )}
+              </div>
+
+              <div className="md:col-span-2 space-y-2">
+                <Label htmlFor="school">Colegio *</Label>
+                <Input
+                  id="school"
+                  value={formData.school}
+                  onChange={(e) => handleInputChange('school', e.target.value)}
+                  placeholder="Ej: Colegio San Francisco"
+                  className={errors.school ? 'border-destructive' : ''}
+                />
+                {errors.school && (
+                  <p className="text-sm text-destructive">{errors.school}</p>
                 )}
               </div>
             </div>

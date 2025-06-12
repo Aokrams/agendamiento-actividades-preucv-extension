@@ -3,14 +3,24 @@ import { useState } from 'react';
 import { CounselorForm } from '@/components/CounselorForm';
 import { ActivityManagement } from '@/components/ActivityManagement';
 import { WelcomeHeader } from '@/components/WelcomeHeader';
+import { ExecutiveSelection } from '@/components/ExecutiveSelection';
+
+export interface Executive {
+  id: string;
+  name: string;
+}
 
 export interface Counselor {
   id: string;
   fullName: string;
   position: string;
   email: string;
-  phone: string;
+  phone?: string;
   avatar: string;
+  region: string;
+  commune: string;
+  school: string;
+  executiveId: string;
 }
 
 export interface Activity {
@@ -18,14 +28,22 @@ export interface Activity {
   title: string;
   date: string;
   startTime: string;
-  endTime: string;
   description: string;
+  course: string;
+  parallel: string;
+  studentCount: number;
 }
 
 const Index = () => {
-  const [currentStep, setCurrentStep] = useState<'welcome' | 'counselor' | 'activities'>('welcome');
+  const [currentStep, setCurrentStep] = useState<'welcome' | 'executive' | 'counselor' | 'activities'>('welcome');
+  const [selectedExecutive, setSelectedExecutive] = useState<Executive | null>(null);
   const [currentCounselor, setCurrentCounselor] = useState<Counselor | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
+
+  const handleExecutiveSelected = (executive: Executive) => {
+    setSelectedExecutive(executive);
+    setCurrentStep('counselor');
+  };
 
   const handleCounselorSaved = (counselor: Counselor) => {
     setCurrentCounselor(counselor);
@@ -34,12 +52,19 @@ const Index = () => {
 
   const handleBackToWelcome = () => {
     setCurrentStep('welcome');
+    setSelectedExecutive(null);
+    setCurrentCounselor(null);
+    setActivities([]);
+  };
+
+  const handleBackToExecutive = () => {
+    setCurrentStep('executive');
     setCurrentCounselor(null);
     setActivities([]);
   };
 
   const handleStartFlow = () => {
-    setCurrentStep('counselor');
+    setCurrentStep('executive');
   };
 
   return (
@@ -49,10 +74,18 @@ const Index = () => {
           <WelcomeHeader onStart={handleStartFlow} />
         )}
         
-        {currentStep === 'counselor' && (
-          <CounselorForm 
-            onCounselorSaved={handleCounselorSaved}
+        {currentStep === 'executive' && (
+          <ExecutiveSelection 
+            onExecutiveSelected={handleExecutiveSelected}
             onBack={handleBackToWelcome}
+          />
+        )}
+        
+        {currentStep === 'counselor' && selectedExecutive && (
+          <CounselorForm 
+            executive={selectedExecutive}
+            onCounselorSaved={handleCounselorSaved}
+            onBack={handleBackToExecutive}
           />
         )}
         
