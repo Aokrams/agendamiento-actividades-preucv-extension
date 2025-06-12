@@ -48,8 +48,17 @@ export const ActivityCard = ({ activity, onEdit, onDelete, style }: ActivityCard
               </div>
               <div className="flex items-center gap-1">
                 <Clock className="h-4 w-4" />
-                {formatTime(activity.startTime)} - {formatTime(activity.endTime)}
+                {formatTime(activity.startTime)}
               </div>
+            </div>
+            
+            <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+              <span className="bg-primary/10 text-primary px-2 py-1 rounded-md text-xs font-medium">
+                {activity.course} {activity.parallel}
+              </span>
+              <span className="text-xs">
+                {activity.studentCount} alumno{activity.studentCount !== 1 ? 's' : ''}
+              </span>
             </div>
             
             {activity.description && (
