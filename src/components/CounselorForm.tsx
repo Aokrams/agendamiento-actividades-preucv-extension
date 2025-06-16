@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,8 @@ import type { Counselor, Executive } from '@/pages/Index';
 interface CounselorFormProps {
   executive: Executive;
   onCounselorSaved: (counselor: Counselor) => void;
-  onBack: () => void;
+  onBack: (formData?: Partial<Counselor>) => void;
+  initialData?: Partial<Counselor>;
 }
 
 const positions = [
@@ -24,23 +25,24 @@ const positions = [
 ];
 
 const regions = [
-  'Región de Arica y Parinacota',
-  'Región de Tarapacá',
-  'Región de Antofagasta',
-  'Región de Atacama',
-  'Región de Coquimbo',
-  'Región de Valparaíso',
-  'Región Metropolitana',
-  'Región del Libertador General Bernardo O\'Higgins',
-  'Región del Maule',
-  'Región de Ñuble',
-  'Región del Biobío',
-  'Región de La Araucanía',
-  'Región de Los Ríos',
-  'Región de Los Lagos',
-  'Región Aysén del General Carlos Ibáñez del Campo',
-  'Región de Magallanes y de la Antártica Chilena'
-];
+    'Arica y Parinacota',
+    'Tarapacá',
+    'Antofagasta',
+    'Atacama',
+    'Coquimbo',
+    'Valparaíso',
+    'Metropolitana de Santiago',
+    "Libertador General Bernardo O'Higgins",
+    'Maule',
+    'Ñuble',
+    'Biobío',
+    'La Araucanía',
+    'Los Ríos',
+    'Los Lagos',
+    'Aysén del General Carlos Ibáñez del Campo',
+    'Magallanes y de la Antártica Chilena'
+  ];
+
 
 const avatarColors = [
   'bg-blue-500',
@@ -53,7 +55,7 @@ const avatarColors = [
   'bg-teal-500'
 ];
 
-export const CounselorForm = ({ executive, onCounselorSaved, onBack }: CounselorFormProps) => {
+export const CounselorForm = ({ executive, onCounselorSaved, onBack, initialData  }: CounselorFormProps) => {
   const [formData, setFormData] = useState({
     fullName: '',
     position: '',
@@ -61,10 +63,107 @@ export const CounselorForm = ({ executive, onCounselorSaved, onBack }: Counselor
     phone: '',
     region: '',
     commune: '',
-    school: ''
+    school: '',
+    school_manual:''
   });
+
+  const [comunas, setComunas] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingComunas, setLoadingComunas] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [colegios, setColegios] = useState<string[]>([]);
+  const [loadingColegios, setLoadingColegios] = useState(false);
+  const [isSearchingPhone, setIsSearchingPhone] = useState(false);
+
+
+  useEffect(() => {
+    if (initialData) {
+      setFormData(prev => ({
+        ...prev,
+        fullName: initialData.fullName || prev.fullName,
+        position: initialData.position || prev.position,
+        email: initialData.email || prev.email,
+        phone: initialData.phone || prev.phone,
+        region: initialData.region || prev.region,
+        commune: initialData.commune || prev.commune,
+        school: initialData.school || prev.school,
+        school_manual: initialData.school_manual || prev.school_manual
+      }));
+    }
+  }, [initialData]);
+
+  // Efecto para cargar comunas cuando cambia la región
+  useEffect(() => {
+    const fetchComunas = async () => {
+      if (!formData.region) {
+        setComunas([]);
+        return;
+      }
+
+      setLoadingComunas(true);
+      try {
+        const response = await fetch(`https://prouniversitas-pbezama.pythonanywhere.com/api/comunasreact/${encodeURIComponent(formData.region)}`);
+        if (!response.ok) {
+          throw new Error('Error al obtener las comunas');
+        }
+        const data = await response.json();
+        setComunas(data);
+        // Resetear comuna seleccionada si ya no está en las nuevas comunas
+        if (formData.commune && !data.includes(formData.commune)) {
+          setFormData(prev => ({ ...prev, commune: '' }));
+        }
+      } catch (error) {
+        console.error('Error fetching comunas:', error);
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar las comunas",
+          variant: "destructive",
+        });
+      } finally {
+        setLoadingComunas(false);
+      }
+    };
+
+    fetchComunas();
+  }, [formData.region]);
+
+  // Efecto para cargar colegios cuando cambia la comuna
+  useEffect(() => {
+    const fetchColegios = async () => {
+      if (!formData.commune) {
+        setColegios([]);
+        return;
+      }
+
+      setLoadingColegios(true);
+      try {
+        const response = await fetch(`https://prouniversitas-pbezama.pythonanywhere.com/api/colegiosreact/${encodeURIComponent(formData.region)}/${encodeURIComponent(formData.commune)}`);
+        if (!response.ok) {
+          throw new Error('Error al obtener los colegios');
+        }
+        const data = await response.json();
+        setColegios(data);
+        // Resetear colegio seleccionado si ya no está en los nuevos colegios
+        if (formData.school && !data.includes(formData.school)) {
+          setFormData(prev => ({ ...prev, school: '' }));
+        }
+      } catch (error) {
+        console.error('Error fetching colegios:', error);
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar los colegios",
+          variant: "destructive",
+        });
+      } finally {
+        setLoadingColegios(false);
+      }
+    };
+
+    fetchColegios();
+  }, [formData.commune]);
+
+
+  
 
   const generateAvatar = (name: string) => {
     const initials = name || 'OR';
@@ -94,8 +193,13 @@ export const CounselorForm = ({ executive, onCounselorSaved, onBack }: Counselor
       newErrors.commune = 'La comuna es obligatoria';
     }
 
-    if (!formData.school.trim()) {
-      newErrors.school = 'El colegio es obligatorio';
+    if (!formData.school.trim() && !formData.school_manual.trim()) {
+      newErrors.school_manual = 'Seleccione un colegio o escribalo';
+      newErrors.school = 'Seleccione un colegio o escribalo';
+    }
+
+    if (!/^569\d{8}$/.test(formData.phone.trim())) {
+      newErrors.phone = 'El formato de numero es: 569XXXXXXXX';
     }
     
     setErrors(newErrors);
@@ -141,13 +245,17 @@ export const CounselorForm = ({ executive, onCounselorSaved, onBack }: Counselor
     }
   };
 
+  const handleBackClick = () => {
+    onBack(formData); // Envía los datos actuales al padre
+  };
+
   return (
     <div className="max-w-2xl mx-auto animate-slide-up">
       <div className="flex items-center gap-4 mb-8">
         <Button 
           variant="ghost" 
           size="icon"
-          onClick={onBack}
+          onClick={handleBackClick}
           className="hover:bg-primary/10"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -236,19 +344,95 @@ export const CounselorForm = ({ executive, onCounselorSaved, onBack }: Counselor
                 )}
               </div>
 
+              
+
+              
+
+
               <div className="space-y-2">
-                <Label htmlFor="phone">Teléfono</Label>
-                <Input
-                  id="phone"
-                  value={formData.phone}
-                  onChange={(e) => handleInputChange('phone', e.target.value)}
-                  placeholder="Ej: +56 9 1234 5678"
-                />
+                <Label htmlFor="phone">Teléfono *</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="phone"
+                    value={formData.phone}
+                    onChange={(e) => handleInputChange('phone', e.target.value)}
+                    placeholder="Ej: 56912345678"
+                    className={errors.phone ? 'border-destructive' : ''}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={async () => {
+                      if (!formData.email) {
+                        toast({
+                          title: "Error",
+                          description: "Por favor ingresa un email primero",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+
+                      setIsSearchingPhone(true);
+                      try {
+                        const response = await fetch(`https://prouniversitas-pbezama.pythonanywhere.com/api/telefonoreact`, {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                          },
+                          body: JSON.stringify({
+                            email: formData.email
+                          })
+                        });
+
+                        if (!response.ok) {
+                          throw new Error('Error al obtener el teléfono');
+                        }
+
+                        const telefono = await response.json();
+                        if (telefono) {
+                          setFormData(prev => ({ ...prev, phone: telefono }));
+                        } else {
+                          toast({
+                            title: "No encontrado",
+                            description: "No se encontró un teléfono asociado a este email",
+                            variant: "default",
+                          });
+                        }
+                      } catch (error) {
+                        console.error('Error buscando teléfono:', error);
+                        toast({
+                          title: "Error",
+                          description: "No se pudo obtener el teléfono",
+                          variant: "destructive",
+                        });
+                      } finally {
+                        setIsSearchingPhone(false);
+                      }
+                    }}
+                    disabled={isSearchingPhone || !formData.email}
+                  >
+                    {isSearchingPhone ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                        Buscando...
+                      </>
+                    ) : (
+                      "Buscar Teléfono"
+                    )}
+                  </Button>
+                </div>
+                {errors.phone && (
+                  <p className="text-sm text-destructive">{errors.phone}</p>
+                )}
               </div>
+
 
               <div className="space-y-2">
                 <Label htmlFor="region">Región *</Label>
-                <Select onValueChange={(value) => handleInputChange('region', value)}>
+                <Select 
+                  onValueChange={(value) => handleInputChange('region', value)}
+                  value={formData.region}
+                >
                   <SelectTrigger className={errors.region ? 'border-destructive' : ''}>
                     <SelectValue placeholder="Selecciona una región" />
                   </SelectTrigger>
@@ -265,33 +449,94 @@ export const CounselorForm = ({ executive, onCounselorSaved, onBack }: Counselor
                 )}
               </div>
 
+              {/* Selector de Comuna */}
               <div className="space-y-2">
                 <Label htmlFor="commune">Comuna *</Label>
-                <Input
-                  id="commune"
+                <Select
+                  onValueChange={(value) => handleInputChange('commune', value)}
                   value={formData.commune}
-                  onChange={(e) => handleInputChange('commune', e.target.value)}
-                  placeholder="Ej: Santiago"
-                  className={errors.commune ? 'border-destructive' : ''}
-                />
+                  disabled={!formData.region || loadingComunas}
+                >
+                  <SelectTrigger className={errors.commune ? 'border-destructive' : ''}>
+                    {loadingComunas ? (
+                      <span>Cargando comunas...</span>
+                    ) : (
+                      <SelectValue placeholder={
+                        formData.region
+                          ? comunas.length === 0
+                            ? 'No hay comunas disponibles'
+                            : 'Selecciona una comuna'
+                          : 'Primero selecciona una región'
+                      } />
+                    )}
+                  </SelectTrigger>
+                  {comunas.length > 0 && (
+                    <SelectContent>
+                      {comunas.map((comuna) => (
+                        <SelectItem key={comuna} value={comuna}>
+                          {comuna}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  )}
+                </Select>
                 {errors.commune && (
                   <p className="text-sm text-destructive">{errors.commune}</p>
                 )}
               </div>
 
-              <div className="md:col-span-2 space-y-2">
+              
+
+              <div className="space-y-2">
                 <Label htmlFor="school">Colegio *</Label>
-                <Input
-                  id="school"
+                <Select
+                  onValueChange={(value) => handleInputChange('school', value)}
                   value={formData.school}
-                  onChange={(e) => handleInputChange('school', e.target.value)}
-                  placeholder="Ej: Colegio San Francisco"
-                  className={errors.school ? 'border-destructive' : ''}
-                />
+                  disabled={!formData.commune || loadingColegios}
+                >
+                  <SelectTrigger className={errors.school ? 'border-destructive' : ''}>
+                    {loadingColegios ? (
+                      <span>Cargando colegios...</span>
+                    ) : (
+                      <SelectValue placeholder={
+                        formData.commune
+                          ? colegios.length === 0
+                            ? 'No hay colegios disponibles'
+                            : 'Selecciona un colegio'
+                          : 'Primero selecciona una comuna'
+                      } />
+                    )}
+                  </SelectTrigger>
+                  {colegios.length > 0 && (
+                    <SelectContent>
+                      {colegios.map((colegio) => (
+                        <SelectItem key={colegio} value={colegio}>
+                          {colegio}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  )}
+                </Select>
                 {errors.school && (
                   <p className="text-sm text-destructive">{errors.school}</p>
                 )}
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="school_manual">Colegio Manual*</Label>
+                <Input
+                  id="school_manual"
+                  value={formData.school_manual}
+                  onChange={(e) => handleInputChange('school_manual', e.target.value)}
+                  placeholder="Escriba el colegio, solo si no lo encuentra en la lista"
+                  className={errors.school_manual ? 'border-destructive' : ''}
+                />
+                {errors.school_manual && (
+                  <p className="text-sm text-destructive">{errors.school_manual}</p>
+                )}
+              </div>
+
+
             </div>
 
             <Button 

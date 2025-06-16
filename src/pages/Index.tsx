@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { CounselorForm } from '@/components/CounselorForm';
 import { ActivityManagement } from '@/components/ActivityManagement';
@@ -20,6 +19,7 @@ export interface Counselor {
   region: string;
   commune: string;
   school: string;
+  school_manual: string;
   executiveId: string;
 }
 
@@ -35,36 +35,49 @@ export interface Activity {
 }
 
 const Index = () => {
-  const [currentStep, setCurrentStep] = useState<'welcome' | 'executive' | 'counselor' | 'activities'>('welcome');
+  const [navigationHistory, setNavigationHistory] = useState<('welcome' | 'executive' | 'counselor' | 'activities')[]>(['welcome']);
+  const currentStep = navigationHistory[navigationHistory.length - 1];
+  
   const [selectedExecutive, setSelectedExecutive] = useState<Executive | null>(null);
   const [currentCounselor, setCurrentCounselor] = useState<Counselor | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [counselorFormData, setCounselorFormData] = useState<Partial<Counselor> | null>(null);
+
+  const navigateTo = (step: 'welcome' | 'executive' | 'counselor' | 'activities') => {
+    setNavigationHistory(prev => [...prev, step]);
+  };
+
+  const goBack = () => {
+    if (navigationHistory.length > 1) {
+      setNavigationHistory(prev => prev.slice(0, -1));
+      // Solo limpiamos todo al volver al inicio
+      if (navigationHistory[navigationHistory.length - 2] === 'welcome') {
+        setSelectedExecutive(null);
+        setCurrentCounselor(null);
+        setActivities([]);
+        setCounselorFormData(null);
+      }
+    }
+  };
+
+  const handleBackFromCounselor = (formData?: Partial<Counselor>) => {
+    setCounselorFormData(formData || null);
+    goBack();
+  };
 
   const handleExecutiveSelected = (executive: Executive) => {
     setSelectedExecutive(executive);
-    setCurrentStep('counselor');
+    navigateTo('counselor');
   };
 
   const handleCounselorSaved = (counselor: Counselor) => {
     setCurrentCounselor(counselor);
-    setCurrentStep('activities');
-  };
-
-  const handleBackToWelcome = () => {
-    setCurrentStep('welcome');
-    setSelectedExecutive(null);
-    setCurrentCounselor(null);
-    setActivities([]);
-  };
-
-  const handleBackToExecutive = () => {
-    setCurrentStep('executive');
-    setCurrentCounselor(null);
-    setActivities([]);
+    // No limpiamos counselorFormData para mantener los datos
+    navigateTo('activities');
   };
 
   const handleStartFlow = () => {
-    setCurrentStep('executive');
+    navigateTo('executive');
   };
 
   return (
@@ -77,7 +90,7 @@ const Index = () => {
         {currentStep === 'executive' && (
           <ExecutiveSelection 
             onExecutiveSelected={handleExecutiveSelected}
-            onBack={handleBackToWelcome}
+            onBack={() => goBack()}
           />
         )}
         
@@ -85,16 +98,21 @@ const Index = () => {
           <CounselorForm 
             executive={selectedExecutive}
             onCounselorSaved={handleCounselorSaved}
-            onBack={handleBackToExecutive}
+            onBack={(formData) => {
+              setCounselorFormData(formData); // Guarda los datos al retroceder
+              goBack();
+            }}
+            initialData={currentCounselor || counselorFormData}
           />
         )}
         
         {currentStep === 'activities' && currentCounselor && (
           <ActivityManagement 
+            executive={selectedExecutive}
             counselor={currentCounselor}
             activities={activities}
             setActivities={setActivities}
-            onBack={handleBackToWelcome}
+            onBack={() => goBack()}
           />
         )}
       </div>

@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -10,9 +10,10 @@ import { ArrowLeft, Plus, Calendar, Clock, BookOpen } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { ActivityCard } from '@/components/ActivityCard';
 import { EmptyState } from '@/components/EmptyState';
-import type { Counselor, Activity } from '@/pages/Index';
+import type { Counselor, Activity, Executive } from '@/pages/Index';
 
 interface ActivityManagementProps {
+  executive: Executive;
   counselor: Counselor;
   activities: Activity[];
   setActivities: (activities: Activity[]) => void;
@@ -27,13 +28,14 @@ const activityTitles = [
 ];
 
 const courses = [
-  '1° Básico', '2° Básico', '3° Básico', '4° Básico', '5° Básico', '6° Básico', '7° Básico', '8° Básico',
+  '7° Básico', '8° Básico',
   '1° Medio', '2° Medio', '3° Medio', '4° Medio'
 ];
 
-const parallels = ['A', 'B', 'C', 'D', 'E', 'F'];
+const parallels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'Ñ', 'O', 'P', 'Q'];
 
 export const ActivityManagement = ({ 
+  executive,
   counselor, 
   activities, 
   setActivities, 
@@ -50,6 +52,61 @@ export const ActivityManagement = ({
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  ////////////////
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchActivities = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const response = await fetch('https://prouniversitas-pbezama.pythonanywhere.com/api/obtiene_agendadoreact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          correo: counselor.email,
+          colegio: counselor.school,
+          colegio_manual: counselor.school_manual,
+          region: counselor.region,
+          comuna: counselor.commune
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al obtener las actividades');
+      }
+
+      const data = await response.json();
+      
+      // Transformar los datos de la API al formato que espera tu aplicación
+      const formattedActivities = data.map((item: any) => ({
+        id: item.id.toString(),
+        title: item.actividad,
+        date: item.fecha,
+        startTime: item.hora,
+        description: item.descripcion || '',
+        course: item.curso,
+        parallel: item.paralelo,
+        studentCount: Number(item.cant_alumnos)
+      }));
+
+      setActivities(formattedActivities);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error desconocido');
+      console.error('Error fetching activities:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchActivities();
+  }, [counselor]);
+
 
   const getAvatarDetails = (avatar: string) => {
     const [colorClass, initials] = avatar.split('|');
@@ -91,32 +148,73 @@ export const ActivityManagement = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validateForm()) return;
+  const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  
+  if (!validateForm()) return;
 
-    const activity: Activity = {
-      id: editingId || Date.now().toString(),
-      ...formData,
-      studentCount: Number(formData.studentCount)
-    };
+  const activityData = {
+    row_id: editingId || '', // Solo necesario para edición
+    correo: counselor.email,
+    colegio: counselor.school,
+    region: counselor.region,
+    comuna: counselor.commune,
+    curso: formData.course,
+    paralelo: formData.parallel,
+    actividad: formData.title,
+    fecha: formData.date,
+    hora: formData.startTime,
+    ejecutiva: executive.name,
+    cant_alumnos: formData.studentCount,
+    colegio_manual: counselor.school_manual,
+    nombre_completo: counselor.fullName,
+    cargo: counselor.position,
+    telefono: counselor.phone,
+    descripcion: formData.description
+  };
 
+  try {
+    const endpoint = editingId 
+      ? 'https://prouniversitas-pbezama.pythonanywhere.com/api/editar_agendadoreact'
+      : 'https://prouniversitas-pbezama.pythonanywhere.com/api/guarda_agendadoreact';
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(activityData)
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Error al guardar');
+    }
+
+    // Manejar la respuesta y actualizar el estado
     if (editingId) {
-      setActivities(activities.map(a => a.id === editingId ? activity : a));
-      setEditingId(null);
+      setActivities(activities.map(a => 
+        a.id === editingId ? { ...a, ...formData, studentCount: Number(formData.studentCount) } : a
+      ));
       toast({
-        title: "¡Actividad actualizada! ✨",
-        description: "Los cambios se han guardado correctamente.",
+        title: "¡Actividad actualizada!",
+        description: data.message || "Cambios guardados correctamente",
       });
     } else {
-      setActivities([activity, ...activities]);
+      const newActivity: Activity = {
+        id: data.inserted_id?.toString() || Date.now().toString(),
+        ...formData,
+        studentCount: Number(formData.studentCount)
+      };
+      setActivities([newActivity, ...activities]);
       toast({
-        title: "¡Actividad guardada, buen trabajo! 🎯",
-        description: `"${formData.title}" se añadió al cronograma.`,
+        title: "¡Actividad creada!",
+        description: data.message || "Actividad agregada al cronograma",
       });
     }
 
+    // Resetear el formulario
     setFormData({
       title: '',
       date: '',
@@ -126,7 +224,19 @@ export const ActivityManagement = ({
       parallel: '',
       studentCount: ''
     });
-  };
+    setEditingId(null);
+
+    await fetchActivities();
+
+  } catch (error) {
+    console.error('Error:', error);
+    toast({
+      title: "Error",
+      description: error instanceof Error ? error.message : "Error al guardar",
+      variant: "destructive"
+    });
+  }
+};
 
   const handleEdit = (activity: Activity) => {
     setFormData({
@@ -134,15 +244,54 @@ export const ActivityManagement = ({
       studentCount: activity.studentCount.toString()
     });
     setEditingId(activity.id);
+    console.log(activity.id)
   };
 
-  const handleDelete = (id: string) => {
+  /////
+  //const handleDelete = (id: string) => {
+    //setActivities(activities.filter(a => a.id !== id));
+    //toast({
+      //title: "Actividad eliminada",
+      //description: "Se ha removido del cronograma.",
+    //});
+  //};
+
+  const handleDelete = async (id: string) => {
+  try {
+    const response = await fetch('https://prouniversitas-pbezama.pythonanywhere.com/api/eliminar_agendadoreact', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        row_id: id // Solo enviamos el row_id que espera el backend
+      })
+    });
+
+    const data = await response.json(); // Parsear la respuesta JSON
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Error al eliminar en el servidor');
+    }
+
+    // Si la API responde OK, actualizar el estado local
     setActivities(activities.filter(a => a.id !== id));
     toast({
       title: "Actividad eliminada",
-      description: "Se ha removido del cronograma.",
+      description: "Se ha removido del cronograma correctamente.",
     });
-  };
+
+    await fetchActivities();
+
+  } catch (error) {
+    console.error('Error:', error);
+    toast({
+      title: "Error al eliminar",
+      description: error instanceof Error ? error.message : "Ocurrió un error desconocido",
+      variant: "destructive"
+    });
+  }
+};
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -182,7 +331,7 @@ export const ActivityManagement = ({
           </div>
           <div>
             <h1 className="text-3xl font-bold">Actividades de {counselor.fullName || 'Orientador'}</h1>
-            <p className="text-muted-foreground">{counselor.position} • {counselor.school}</p>
+            <p className="text-muted-foreground">{counselor.position} • {counselor.school === '' ? counselor.school_manual : counselor.school}</p>
           </div>
         </div>
       </div>
@@ -359,14 +508,31 @@ export const ActivityManagement = ({
               <BookOpen className="h-5 w-5 text-primary" />
               Cronograma de actividades
             </h2>
-            {activities.length > 0 && (
+            {!isLoading && activities.length > 0 && (
               <span className="text-sm bg-primary/10 text-primary px-3 py-1 rounded-full font-medium animate-bounce-in">
                 {activities.length} actividad{activities.length !== 1 ? 'es' : ''} registrada{activities.length !== 1 ? 's' : ''}
               </span>
             )}
           </div>
 
-          {activities.length === 0 ? (
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mb-4"></div>
+              <p>Cargando actividades...</p>
+            </div>
+          ) : error ? (
+            <div className="bg-destructive/10 p-4 rounded-lg border border-destructive/30">
+              <p className="text-destructive">{error}</p>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="mt-2"
+                onClick={fetchActivities}
+              >
+                Reintentar
+              </Button>
+            </div>
+          ) : activities.length === 0 ? (
             <EmptyState />
           ) : (
             <div className="space-y-4">
@@ -382,6 +548,7 @@ export const ActivityManagement = ({
             </div>
           )}
         </div>
+
       </div>
     </div>
   );
